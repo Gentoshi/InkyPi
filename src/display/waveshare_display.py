@@ -11,6 +11,33 @@ from plugins.plugin_registry import get_plugin_instance
 logger = logging.getLogger(__name__)
 
 
+def should_clear_before_update(clear_every_n_updates, updates_since_clear):
+    """
+    Decide whether the pre-update Clear() should run.
+
+    Args:
+        clear_every_n_updates: 1 = clear before every update (default, current
+                               behavior), 0 = never clear, n>1 = clear then skip
+                               the next n-1 updates.
+        updates_since_clear: number of updates since the last full clear.
+
+    Returns:
+        (do_clear, new_updates_since_clear) tuple.
+    """
+    n = clear_every_n_updates
+    if isinstance(n, bool) or not isinstance(n, int):
+        n = 1
+    if n < 0:
+        n = 1
+
+    if n == 0:
+        return False, updates_since_clear + 1
+
+    if updates_since_clear % n == 0:
+        return True, 1
+    return False, updates_since_clear + 1
+
+
 def split_image_for_bi_color_epd(image):
     """
     Convert image into two 1-bit layers for bi-color (black and red) e-paper displays.
