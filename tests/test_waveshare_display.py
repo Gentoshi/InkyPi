@@ -1,6 +1,8 @@
+from unittest.mock import MagicMock
+
 import pytest
 
-from src.display.waveshare_display import should_clear_before_update
+from src.display.waveshare_display import WaveshareDisplay, should_clear_before_update
 
 
 @pytest.mark.parametrize(
@@ -24,3 +26,43 @@ def test_should_clear_before_update(n, counter, expected):
 def test_invalid_values_clamp_to_default(bad):
     # Clamped to n=1: always clear, counter resets to 1.
     assert should_clear_before_update(bad, 4) == (True, 1)
+
+
+def _make_display(n, counter=0):
+    disp = object.__new__(WaveshareDisplay)
+    disp.epd_display = MagicMock()
+    disp.epd_display.width = 800
+    disp.epd_display.height = 480
+    disp.epd_display_init = MagicMock()
+    disp.bi_color_display = False
+    disp.clear_every_n_updates = n
+    disp._updates_since_clear = counter
+    return disp
+
+
+def test_clear_runs_by_default():
+    disp = _make_display(1)
+    disp.display_image(object())
+    assert disp.epd_display.Clear.call_count == 1
+    assert disp._updates_since_clear == 1
+
+
+def test_clear_skipped_when_disabled():
+    disp = _make_display(0, counter=4)
+    disp.display_image(object())
+    assert disp.epd_display.Clear.call_count == 0
+    assert disp._updates_since_clear == 5
+
+
+def test_clear_fires_on_nth_update():
+    disp = _make_display(3, counter=3)
+    disp.display_image(object())
+    assert disp.epd_display.Clear.call_count == 1
+    assert disp._updates_since_clear == 1
+
+
+def test_display_still_called_on_skip():
+    disp = _make_display(0)
+    disp.display_image(object())
+    disp.epd_display.display.assert_called_once()
+    disp.epd_display.sleep.assert_called_once()

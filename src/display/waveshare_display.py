@@ -80,6 +80,9 @@ class WaveshareDisplay(AbstractDisplay):
                         not found.
         """
         
+        self._updates_since_clear = 0
+        self.clear_every_n_updates = self.device_config.get_config("clear_every_n_updates", 1)
+
         logger.info("Initializing Waveshare display")
 
         # get the device type which should be the model number of the device.
@@ -150,8 +153,15 @@ class WaveshareDisplay(AbstractDisplay):
         # Assume device was in sleep mode.
         self.epd_display_init()
 
-        # Clear residual pixels before updating the image.
-        self.epd_display.Clear()
+        # Clear residual pixels before updating the image unless the
+        # clear_every_n_updates toggle defers/skips it (faster refresh).
+        do_clear, self._updates_since_clear = should_clear_before_update(
+            self.clear_every_n_updates, self._updates_since_clear)
+        if do_clear:
+            logger.info("Running pre-update Clear (clear_every_n_updates=%s)", self.clear_every_n_updates)
+            self.epd_display.Clear()
+        else:
+            logger.info("Skipping pre-update Clear (clear_every_n_updates=%s)", self.clear_every_n_updates)
 
         # Display the image on the WS display.
         if not self.bi_color_display:
